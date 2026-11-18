@@ -1,0 +1,40 @@
+name: Build Voice2MIDI VST3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'Source/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build-windows.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC build environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure project
+        run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target Voice2MIDI_VST3 --parallel
+
+      - name: Package VST3
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem -Path build -Directory -Recurse -Filter "Voice2MIDI.vst3" | Select-Object -First 1
+          if (-not $plugin) { throw "Voice2MIDI.vst3 was not found after build." }
+          Compress-Archive -Path $plugin.FullName -DestinationPath Voice2MIDI-VST3-Windows.zip -Force
+
+      - name: Upload VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voice2MIDI-VST3-Windows
+          path: Voice2MIDI-VST3-Windows.zip
+          if-no-files-found: error
